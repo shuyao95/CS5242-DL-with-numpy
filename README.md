@@ -1,5 +1,5 @@
-# CS5242_CNN
-CS5242 Assignment 1 of NUS
+# cs5242
+CS5242 Assignments of NUS
 
 ## requirements
 ### python version
