@@ -1,13 +1,17 @@
-import numpy as np 
-import copy, pickle, sys
+import numpy as np
+import copy
+import pickle
+import sys
+import time
+
 from utils.tools import clip_gradients
 
+
 class Model():
-    
     def __init__(self):
         self.layers = []
         self.inputs = None
-        self.optimizer = None 
+        self.optimizer = None
         self.regularization = None
 
     def add(self, layer):
@@ -22,9 +26,8 @@ class Model():
         self.inputs = []
         layer_inputs = inputs
         for l, layer in enumerate(self.layers):
-            # print(layer.name, layer_inputs)
             self.inputs.append(layer_inputs)
-            if l==len(self.layers)-1:
+            if l == len(self.layers)-1:
                 layer_inputs, probs = layer.forward(layer_inputs, targets)
             else:
                 layer_inputs = layer.forward(layer_inputs)
@@ -33,7 +36,7 @@ class Model():
 
     def backward(self, targets):
         for l, layer in enumerate(self.layers[::-1]):
-            if l==0:
+            if l == 0:
                 grads = layer.backward(self.inputs[-1-l], targets)
             else:
                 grads = layer.backward(grads, self.inputs[-1-l])
@@ -43,7 +46,7 @@ class Model():
         grads = {}
         for l, layer in enumerate(self.layers):
             if layer.trainable:
-                layer_params, layer_grads = layer.get_params('layer-%dth'%l)
+                layer_params, layer_grads = layer.get_params('layer-%dth' % l)
                 params.update(layer_params)
                 grads.update(layer_grads)
 
@@ -65,8 +68,8 @@ class Model():
 
         for l, layer in enumerate(self.layers):
             if layer.trainable:
-                w_key = 'layer-%dth:'%l + layer.name + '/weights'
-                b_key = 'layer-%dth:'%l + layer.name + '/bias'
+                w_key = 'layer-%dth:' % l + layer.name + '/weights'
+                b_key = 'layer-%dth:' % l + layer.name + '/bias'
                 layer_params = {
                     w_key: new_params[w_key],
                     b_key: new_params[b_key]
@@ -82,45 +85,43 @@ class Model():
         val_results = []
 
         for epoch in range(epochs):
-            print('Epoch %d: '%epoch, end='\n')
+            print('Epoch %d: ' % epoch, end='\n')
+            start = time.time()
             for iteration in range(num_train//train_batch):
-                
                 total_iteration = epoch*(num_train//train_batch)+iteration
                 # output test loss and accuracy
-                if iteration % test_intervals == 0:
+                if test_intervals > 0 and iteration > 0 and iteration % test_intervals == 0:
                     test_loss, test_acc = self.test(dataset, test_batch)
                     test_results.append([total_iteration, test_loss, test_acc])
 
-
-                if iteration % val_intervals == 0:
+                if val_intervals > 0 and iteration > 0 and iteration % val_intervals == 0:
                     val_loss, val_acc = self.val(dataset, val_batch)
                     val_results.append([total_iteration, val_loss, val_acc])
 
                 x, y = next(train_loader)
                 loss, probs = self.forward(x, y)
-                acc = np.sum(np.argmax(probs, axis=-1)==y) / train_batch
+                acc = np.sum(np.argmax(probs, axis=-1) == y) / train_batch
                 train_results.append([total_iteration, loss, acc])
 
                 if self.regularization:
                     params, _ = self.get_params()
                     reg_loss = self.regularization.forward(params)
 
-                if iteration % print_intervals == 0:
-                    print('Iteration %d:\t'%iteration, end='')
-                    print('accuracy=%.5f, loss=%.5f'%(acc, loss), end='')
-                    if self.regularization:
-                        print(', regularization loss=', reg_loss)
-                    else:
-                        print('\n')
-
-                    # for layer in self.layers:
-                    #     if layer.trainable:
-                    #         print(layer.name, np.mean(np.abs(layer.weights)))
-                
                 self.backward(y)
                 self.update(self.optimizer, total_iteration)
-        return np.array(train_results), np.array(val_results), np.array(test_results)
 
+                if iteration > 0 and iteration % print_intervals == 0:
+                    speed = (print_intervals*train_batch) / \
+                        (time.time() - start)
+                    print('Train iter %d/%d:\t' %
+                          (iteration, num_train//train_batch), end='')
+                    print('acc %.2f, loss %.2f' % (acc, loss), end='')
+                    if self.regularization:
+                        print(', reg loss %.2f' % reg_loss, end='')
+                    print(', speed %.2f imgs/sec' % (speed))
+                    start = time.time()
+
+        return np.array(train_results), np.array(val_results), np.array(test_results)
 
     def test(self, dataset, test_batch):
         # set the mode into testing mode
@@ -134,21 +135,19 @@ class Model():
             while True:
                 x, y = next(test_loader)
                 loss, probs = self.forward(x, y)
-                num_accurate += np.sum(np.argmax(probs, axis=-1)==y)
+                num_accurate += np.sum(np.argmax(probs, axis=-1) == y)
                 sum_loss += loss
         except StopIteration:
             avg_loss = sum_loss*test_batch/num_test
             accuracy = num_accurate/num_test
-            print('Test accuracy=%.5f, loss=%.5f'%(accuracy, avg_loss))
+            print('Test acc %.2f, loss %.2f' % (accuracy, avg_loss))
 
         # reset the mode into training for continous training
         for layer in self.layers:
             layer.set_mode(training=True)
 
         return avg_loss, accuracy
-        
 
-    
     def val(self, dataset, val_batch):
         # set the mode into testing mode
         for layer in self.layers:
@@ -161,12 +160,13 @@ class Model():
             while True:
                 x, y = next(val_loader)
                 loss, probs = self.forward(x, y)
-                num_accurate += np.sum(np.argmax(probs, axis=-1)==y)
+                num_accurate += np.sum(np.argmax(probs, axis=-1) == y)
                 sum_loss += loss
         except StopIteration:
             avg_loss = sum_loss*val_batch/num_val
             accuracy = num_accurate/num_val
-            print('Validation accuracy: %.5f, loss: %.5f'%(accuracy, avg_loss))
+            print('Val accuracy %.2f, loss %.2f' %
+                  (accuracy, avg_loss))
 
         # reset the mode into training for continous training
         for layer in self.layers:

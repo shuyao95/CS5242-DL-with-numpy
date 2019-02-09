@@ -1,69 +1,25 @@
 import numpy as np
+from .operations import softmax_cross_entropy_forward, softmax_cross_entropy_backward
+
 
 class Loss(object):
-    
-    def __init__(self):
-        self.trainable = False # Whether there are parameters in this layer that can be trained
-        self.training = False # The phrase, if for training then true
 
-    def forward(self, inputs, targets):
-        """Forward pass, reture outputs"""
+    def __init__(self):
+        self.trainable = False  # Whether there are parameters in this layer that can be trained
+        self.training = False  # The phrase, if for training then true
+
+    def forward(self, input, labels):
+        """Forward pass, reture output"""
         raise NotImplementedError
 
-    def backward(self, inputs, targets):
-        """Backward pass, return gradients to inputs"""
+    def backward(self, input, labels):
+        """Backward pass, return gradients to input"""
         raise NotImplementedError
 
     def set_mode(self, training):
         """Set the phrase/mode into training (True) or tesing (False)"""
         self.training = training
 
-class CrossEntropy(Loss):
-    def __init__(self, num_class, epsilon=1e-8):
-        """Initialization
-
-        # Arguments
-            num_class: int, the number of category
-            epsilon: float, precision to avoid overflow
-        """
-        self.num_class = num_class
-        self.epsilon = epsilon
-
-    def forward(self, inputs, targets):
-        """Forward pass
-
-        # Arguments
-            inputs: numpy array with shape (batch, num_class)
-            targets: numpy array with shape (batch,)
-
-        # Returns
-            outputs: float, batch loss
-        """
-        batch = len(targets)
-        one_hot = np.zeros((batch, self.num_class))
-        for row, idx in enumerate(targets):
-            one_hot[row, idx] = 1
-        clip_inputs = self.epsilon*(inputs<self.epsilon) + inputs*(inputs>self.epsilon)
-        outputs = -1 * np.sum(one_hot * np.log(clip_inputs)) / batch
-        return outputs
-
-    def backward(self, inputs, targets):
-        """Backward pass
-
-        # Arguments
-            inputs: numpy array with shape (batch, num_class), same with forward inputs
-            targets: numpy array with shape (batch,), same eith forward targets
-
-        # Returns
-            out_grads: numpy array with shape (batch, num_class), gradients to inputs 
-        """
-        batch = len(targets)
-        one_hot = np.zeros((batch, self.num_class))
-        for row, idx in enumerate(targets):
-            one_hot[row, idx] = 1
-        clip_inputs = self.epsilon*(inputs<self.epsilon) + inputs*(inputs>self.epsilon)
-        out_grads = - one_hot * (1/clip_inputs) / batch
-        return out_grads
 
 class SoftmaxCrossEntropy(Loss):
     def __init__(self, num_class):
@@ -75,53 +31,21 @@ class SoftmaxCrossEntropy(Loss):
         super(SoftmaxCrossEntropy, self).__init__()
         self.num_class = num_class
 
-    def forward(self, inputs, targets):
-        """Forward pass
+    def forward(self, input, labels):
+        output, probs = softmax_cross_entropy_forward(input, labels)
+        return output, probs
 
-        # Arguments
-            inputs: numpy array with shape (batch, num_class)
-            targets: numpy array with shape (batch,)
+    def backward(self, input, labels):
+        in_grad = softmax_cross_entropy_backward(input, labels)
+        return in_grad
 
-        # Returns
-            outputs: float, batch loss
-            probs: numpy array with shape (batch, num_class), probability to each category with respect to each image
-        """
-        batch = len(targets)
-        inputs_shift = inputs - np.max(inputs, axis=1, keepdims=True)
-        Z = np.sum(np.exp(inputs_shift), axis=1, keepdims=True)
-        
-        log_probs = inputs_shift - np.log(Z)
-        probs = np.exp(log_probs)
-        outputs = -1 * np.sum(log_probs[np.arange(batch), targets]) / batch
-        return outputs, probs
-
-    def backward(self, inputs, targets):
-        """Backward pass
-
-        # Arguments
-            inputs: numpy array with shape (batch, num_class), same with forward inputs
-            targets: numpy array with shape (batch,), same eith forward targets
-
-        # Returns
-            out_grads: numpy array with shape (batch, num_class), gradients to inputs 
-        """
-        batch = len(targets)
-        inputs_shift = inputs - np.max(inputs, axis=1, keepdims=True)
-        Z = np.sum(np.exp(inputs_shift), axis=1, keepdims=True)
-        log_probs = inputs_shift - np.log(Z)
-        probs = np.exp(log_probs)
-        
-        out_grads = probs.copy()
-        out_grads[np.arange(batch), targets] -= 1
-        out_grads /= batch
-        return out_grads
 
 class L2(Loss):
     def __init__(self, w=0.01):
         """Initialization
 
         # Arguments
-            w: float, weight decay ratio.
+            w: float, weight decay coefficient.
         """
         self.w = w
 
@@ -132,13 +56,15 @@ class L2(Loss):
             params: dictionary, store all weights of the whole model
 
         # Returns
-            outputs: float, L2 regularization loss
+            output: float, L2 regularization loss
         """
         loss = 0
-        for _, v in params.items():
-            loss += np.sum(v**2)
-        outputs = 0.5 * self.w * loss
-        return outputs
+        for n, v in params.items():
+            # only decay the weights
+            if 'weights' in n:
+                loss += np.sum(v**2)
+        output = 0.5 * self.w * loss
+        return output
 
     def backward(self, params):
         """Backward pass
@@ -147,9 +73,12 @@ class L2(Loss):
             params: dictionary, store all weights of the whole model
 
         # Returns
-            out_grads: dictionary, gradients to each weights in params 
+            in_grad: dictionary, gradients to each weights in params 
         """
-        out_grads = {}
+        in_grad = {}
         for k, v in params.items():
-            out_grads[k] = self.w * params[k]
-        return out_grads
+            if 'weights' in k:
+                in_grad[k] = self.w * params[k]
+            else:
+                in_grad[k] = np.zeros(v.shape)
+        return in_grad
