@@ -1,6 +1,5 @@
 import numpy as np
-from itertools import product
-
+from utils.tools import img2col
 # Attension:
 # - Never change the value of input, which will change the result of backward
 
@@ -57,14 +56,6 @@ def fc_backward(out_grad, input, weights, bias):
     w_grad = np.matmul(input.T, out_grad)
     b_grad = np.sum(out_grad, axis=0)
     return in_grad, w_grad, b_grad
-
-
-def img2col(data, h_indices, w_indices, k_h, k_w):
-    batch = data.shape[0]
-    indices = list(product(h_indices, w_indices))
-    out = np.stack(map(
-        lambda x: data[:, :, x[0]:x[0]+k_h, x[1]:x[1]+k_w].reshape(batch, -1), indices), axis=-1)
-    return out
 
 
 def conv_forward(input, weights, bias, conv_params):
