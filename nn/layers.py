@@ -49,6 +49,8 @@ class FCLayer(Layer):
             initializer: Initializer class, to initialize weights
         """
         super(FCLayer, self).__init__(name=name)
+        self.fc = fc()
+
         self.trainable = True
 
         self.weights = initializer.initialize((in_features, out_features))
@@ -58,11 +60,11 @@ class FCLayer(Layer):
         self.b_grad = np.zeros(self.bias.shape)
 
     def forward(self, input):
-        output = fc_forward(input, self.weights, self.bias)
+        output = self.fc.forward(input, self.weights, self.bias)
         return output
 
     def backward(self, out_grad, input):
-        in_grad, self.w_grad, self.b_grad = fc_backward(
+        in_grad, self.w_grad, self.b_grad = self.fc.backward(
             out_grad, input, self.weights, self.bias)
         return in_grad
 
@@ -122,8 +124,10 @@ class Convolution(Layer):
             initializer: Initializer class, to initialize weights
         """
         super(Convolution, self).__init__(name=name)
-        self.trainable = True
         self.conv_params = conv_params
+        self.conv = conv(conv_params)
+
+        self.trainable = True
 
         self.weights = initializer.initialize(
             (conv_params['out_channel'], conv_params['in_channel'], conv_params['kernel_h'], conv_params['kernel_w']))
@@ -133,12 +137,12 @@ class Convolution(Layer):
         self.b_grad = np.zeros(self.bias.shape)
 
     def forward(self, input):
-        output = conv_forward(input, self.weights, self.bias, self.conv_params)
+        output = self.conv.forward(input, self.weights, self.bias)
         return output
 
     def backward(self, out_grad, input):
-        in_grad, self.w_grad, self.b_grad = conv_backward(
-            out_grad, input, self.weights, self.bias, self.conv_params)
+        in_grad, self.w_grad, self.b_grad = self.conv.backward(
+            out_grad, input, self.weights, self.bias)
         return in_grad
 
     def update(self, params):
@@ -187,6 +191,7 @@ class ReLU(Layer):
         """Initialization
         """
         super(ReLU, self).__init__(name=name)
+        self.relu = relu()
 
     def forward(self, input):
         """Forward pass
@@ -197,7 +202,7 @@ class ReLU(Layer):
         # Returns
             output: numpy array
         """
-        output = relu_forward(input)
+        output = self.relu.forward(input)
         return output
 
     def backward(self, out_grad, input):
@@ -210,7 +215,7 @@ class ReLU(Layer):
         # Returns
             in_grad: numpy array, gradient to input 
         """
-        in_grad = relu_backward(out_grad, input)
+        in_grad = self.relu.backward(out_grad, input)
         return in_grad
 
 
@@ -228,13 +233,14 @@ class Pooling(Layer):
         """
         super(Pooling, self).__init__(name=name)
         self.pool_params = pool_params
+        self.pool = pool(pool_params)
 
     def forward(self, input):
-        output = pool_forward(input, self.pool_params)
+        output = self.pool.forward(input)
         return output
 
     def backward(self, out_grad, input):
-        in_grad = pool_backward(out_grad, input, self.pool_params)
+        in_grad = self.pool.backward(out_grad, input)
         return in_grad
 
 
@@ -243,23 +249,26 @@ class Dropout(Layer):
         """Initialization
 
         # Arguments
-            ratio: float [0, 1], the probability of setting a neuron to zero
+            rate: float [0, 1], the probability of setting a neuron to zero
             seed: int, random seed to sample from input, so as to get mask, which is convenient to check gradients. But for real training, it should be None to make sure to randomly drop neurons
         """
         super(Dropout, self).__init__(name=name)
         self.rate = rate
-        self.mask = None
         self.seed = seed
+        self.dropout = dropout(rate, self.training, seed)
 
     def forward(self, input):
-        output, self.mask = dropout_forward(
-            input, self.rate, self.training, self.seed)
+        output = self.dropout.forward(input)
         return output
 
     def backward(self, out_grad, input):
-        in_grad = dropout_backward(
-            out_grad, input, self.rate, self.mask, self.training)
+        in_grad = self.dropout.backward(out_grad, input)
         return in_grad
+
+    def set_mode(self, training):
+        """Set the phrase/mode into training (True) or tesing (False)"""
+        self.training = training
+        self.dropout.training = training
 
 
 class Flatten(Layer):
@@ -267,6 +276,7 @@ class Flatten(Layer):
         """Initialization
         """
         super(Flatten, self).__init__(name=name)
+        self.flatten = flatten()
 
     def forward(self, input):
         """Forward pass
@@ -277,7 +287,7 @@ class Flatten(Layer):
         # Returns
             output: numpy array with shape (batch, in_channel*in_height*in_width)
         """
-        output = flatten_forward(input)
+        output = self.flatten.forward(input)
         return output
 
     def backward(self, out_grad, input):
@@ -290,5 +300,5 @@ class Flatten(Layer):
         # Returns
             in_grad: numpy array with shape (batch, in_channel, in_height, in_width), gradient to input 
         """
-        in_grad = flatten_backward(out_grad, input)
+        in_grad = self.flatten.backward(out_grad, input)
         return in_grad

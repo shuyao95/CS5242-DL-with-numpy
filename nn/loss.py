@@ -1,5 +1,5 @@
 import numpy as np
-from .operations import softmax_cross_entropy_forward, softmax_cross_entropy_backward
+from .operations import softmax_cross_entropy
 
 
 class Loss(object):
@@ -30,13 +30,14 @@ class SoftmaxCrossEntropy(Loss):
         """
         super(SoftmaxCrossEntropy, self).__init__()
         self.num_class = num_class
+        self.softmax_cross_entropy = softmax_cross_entropy()
 
     def forward(self, input, labels):
-        output, probs = softmax_cross_entropy_forward(input, labels)
+        output, probs = self.softmax_cross_entropy.forward(input, labels)
         return output, probs
 
     def backward(self, input, labels):
-        in_grad = softmax_cross_entropy_backward(input, labels)
+        in_grad = self.softmax_cross_entropy.backward(input, labels)
         return in_grad
 
 
