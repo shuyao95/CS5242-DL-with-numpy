@@ -45,9 +45,72 @@ class flatten(operation):
         return in_grad
 
 
+class matmul(operation):
+    def __init__(self):
+        super(matmul, self).__init__()
+
+    def forward(self, input, weights):
+        """
+        # Arguments
+            input: numpy array with shape (batch, in_features)
+            weights: numpy array with shape (in_features, out_features)
+
+        # Returns
+            output: numpy array with shape(batch, out_features)
+        """
+        return np.matmul(input, weights)
+
+    def backward(self, out_grad, input, weights):
+        """
+        # Arguments
+            out_grad: gradient to the forward output of fc layer, with shape (batch, out_features)
+            input: numpy array with shape (batch, in_features)
+            weights: numpy array with shape (in_features, out_features)
+
+        # Returns
+            in_grad: gradient to the forward input with same shape as input
+            w_grad: gradient to weights, with same shape as weights            
+        """
+        in_grad = np.matmul(out_grad, weights.T)
+        w_grad = np.matmul(input.T, out_grad)
+        return in_grad, w_grad
+
+
+class add_bias(operation):
+    def __init__(self):
+        super(add_bias, self).__init__()
+
+    def forward(self, input, bias):
+        '''
+        # Arugments
+          input: numpy array with shape (batch, in_features)
+          bias: numpy array with shape (in_features)
+
+        # Returns
+          output: numpy array with shape(batch, in_features)
+        '''
+        return input + bias.reshape(1, -1)
+
+    def backward(self, out_grad, input, bias):
+        """
+        # Arguments
+            out_grad: gradient to the forward output of fc layer, with shape (batch, out_features)
+            input: numpy array with shape (batch, in_features)
+            bias: numpy array with shape (out_features)
+        # Returns
+            in_grad: gradient to the forward input with same shape as input
+            b_bias: gradient to bias, with same shape as bias
+        """
+        in_grad = out_grad
+        b_grad = np.sum(out_grad, axis=0)
+        return in_grad, b_grad
+
+
 class fc(operation):
     def __init__(self):
         super(fc, self).__init__()
+        self.matmul = matmul()
+        self.add_bias = add_bias()
 
     def forward(self, input, weights, bias):
         """
@@ -59,7 +122,9 @@ class fc(operation):
         # Returns
             output: numpy array with shape(batch, out_features)
         """
-        output = np.matmul(input, weights) + bias.reshape(1, -1)
+        output = self.matmul.forward(input, weights)
+        output = self.add_bias.forward(output, bias)
+        # output = np.matmul(input, weights) + bias.reshape(1, -1)
         return output
 
     def backward(self, out_grad, input, weights, bias):
@@ -75,9 +140,11 @@ class fc(operation):
             w_grad: gradient to weights, with same shape as weights
             b_bias: gradient to bias, with same shape as bias
         """
-        in_grad = np.matmul(out_grad, weights.T)
-        w_grad = np.matmul(input.T, out_grad)
-        b_grad = np.sum(out_grad, axis=0)
+        # in_grad = np.matmul(out_grad, weights.T)
+        # w_grad = np.matmul(input.T, out_grad)
+        # b_grad = np.sum(out_grad, axis=0)
+        out_grad, b_grad = self.add_bias.backward(out_grad, input, bias)
+        in_grad, w_grad = self.matmul.backward(out_grad, input, weights)
         return in_grad, w_grad, b_grad
 
 
