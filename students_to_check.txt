@@ -1,0 +1,11 @@
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/A0186005L, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0001428, error: No module named 'nn.layers'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0267421, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/E0320229, error: No module named 'librosa'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/E0338027, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0338039 2, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0338099 2, error: invalid syntax (operations.py, line 336)
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/E0338107, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0383395, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0386653, error: No module named 'nn'
+student: /Users/shuyao/Downloads/Assignment 1 Submiss/e0320229, error: No module named 'librosa'

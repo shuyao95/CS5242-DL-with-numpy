@@ -161,7 +161,7 @@ class RMSprop(Optimizer):
             self.lr = self.sheduler(self.sheduler_func, iteration)
         if not self.accumulators:
             self.accumulators = {}
-            for k, v in xs.ietms():
+            for k, v in xs.items():
                 self.accumulators[k] = np.zeros(v.shape)
         for k in list(xs.keys()):
             self.accumulators[k] = self.rho * \
@@ -213,7 +213,7 @@ class Adam(Optimizer):
             self.lr *= (1/(1+self.decay*iteration))
         if self.sheduler_func:
             self.lr = self.sheduler(self.sheduler_func, iteration)
-        if not self.accumulators or self.moments:
+        if (self.accumulators is None) and (self.moments is None):
             self.moments = {}
             self.accumulators = {}
             for k, v in xs.items():

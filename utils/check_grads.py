@@ -75,7 +75,7 @@ def eval_numerical_gradient_loss(loss, inputs, targets, h=1e-5):
     return grads
 
 
-def check_grads(cacul_grads, numer_grads, threshold=1e-7):
+def check_grads(cacul_grads, numer_grads):
     precise = np.linalg.norm(cacul_grads-numer_grads) / \
         max(np.linalg.norm(cacul_grads), np.linalg.norm(numer_grads))
     return precise
@@ -99,6 +99,21 @@ def check_grads_layer(layer, inputs, in_grads):
         b_results = check_grads(layer.b_grad, b_grad)
         print('Gradient to weights: ', map_bool[str(w_results < 1e-8)])
         print('Gradient to bias: ', map_bool[str(b_results < 1e-8)])
+
+def check_grads_layer_error(layer, inputs, in_grads):
+    results = []
+    numer_grads = eval_numerical_gradient_inputs(layer, inputs, in_grads)
+    cacul_grads = layer.backward(in_grads, inputs)
+    inputs_result = check_grads(cacul_grads, numer_grads)
+    results.append(inputs_result)
+    if layer.trainable:
+        w_grad, b_grad = eval_numerical_gradient_params(
+            layer, inputs, in_grads)
+        w_results = check_grads(layer.w_grad, w_grad)
+        b_results = check_grads(layer.b_grad, b_grad)
+        results.append(w_results)
+        results.append(b_results)
+    return results
 
 
 def check_grads_loss(layer, inputs, targets):

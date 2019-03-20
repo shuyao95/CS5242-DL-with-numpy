@@ -388,6 +388,7 @@ class dropout(operation):
             scale = 1/(1-self.rate)
             np.random.seed(self.seed)
             p = np.random.random_sample(input.shape)
+            # Please use p as the probability to decide whether drop or not
             self.mask = (p >= self.rate).astype('int')
             output = input * self.mask * scale
         else:

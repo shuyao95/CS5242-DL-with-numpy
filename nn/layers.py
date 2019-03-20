@@ -40,7 +40,7 @@ class Layer(object):
 
 
 class FCLayer(Layer):
-    def __init__(self, in_features, out_features, name='fclayer', initializer=Guassian()):
+    def __init__(self, in_features, out_features, name='fclayer', initializer=Gaussian()):
         """Initialization
 
         # Arguments
@@ -110,7 +110,7 @@ class FCLayer(Layer):
 
 
 class Convolution(Layer):
-    def __init__(self, conv_params, initializer=Guassian(), name='conv'):
+    def __init__(self, conv_params, initializer=Gaussian(), name='conv'):
         """Initialization
 
         # Arguments
@@ -302,3 +302,7 @@ class Flatten(Layer):
         """
         in_grad = self.flatten.backward(out_grad, input)
         return in_grad
+
+# TODO: implement batch normalization for stable training
+# TODO: reduce randomness during training with specific seed
+# TODO: tuninng hyper-parameters
