@@ -1,4 +1,4 @@
-from nn.layers import *
+from nn.cnn_layers import *
 from nn.model import Model
 
 

@@ -10,3 +10,7 @@ CS5242 Assignments of NUS
 - tensorflow
 - keras
 - matplotlib
+- numpy
+- jupyter
+- pandas
+- nltk

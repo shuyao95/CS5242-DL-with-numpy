@@ -7,7 +7,6 @@ class Layer(object):
     """
     Layer abstraction
     """
-
     def __init__(self, name):
         """Initialization"""
         self.name = name

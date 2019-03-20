@@ -412,6 +412,49 @@ class dropout(operation):
             in_grad = out_grad
         return in_grad
 
+class RNNCell(operation):
+    def __init__(self):
+        """
+        # Arguments
+            in_features: int, the number of inputs features
+            units: int, the number of hidden units
+            initializer: Initializer class, to initialize weights
+        """
+        super(RNNCell, self).__init__()
+
+    def forward(self, input, kernel, recurrent_kernel, bias):
+        """
+        # Arguments
+            inputs: [input numpy array with shape (batch, in_features), 
+                    state numpy array with shape (batch, units)]
+
+        # Returns
+            outputs: numpy array with shape (batch, units)
+        """
+        x, prev_h = input
+        output = np.tanh(x.dot(kernel) + prev_h.dot(recurrent_kernel) + bias)
+        return output
+
+    def backward(self, out_grad, input, kernel, recurrent_kernel, bias):
+        """
+        # Arguments
+            in_grads: numpy array with shape (batch, units), gradients to outputs
+            inputs: [input numpy array with shape (batch, in_features), 
+                    state numpy array with shape (batch, units)], same with forward inputs
+
+        # Returns
+            out_grads: [gradients to input numpy array with shape (batch, in_features), 
+                        gradients to state numpy array with shape (batch, units)]
+        """
+        x, prev_h = input
+        tanh_grad = np.nan_to_num(out_grad*(1-np.square(self.forward(input, kernel, recurrent_kernel, bias))))
+        
+        in_grad = [np.matmul(tanh_grad, kernel.T), np.matmul(tanh_grad, recurrent_kernel.T)]
+        kernel_grad = np.matmul(np.nan_to_num(x.T), tanh_grad)
+        r_kernel_grad = np.matmul(np.nan_to_num(prev_h.T), tanh_grad)
+        b_grad = np.sum(tanh_grad, axis=0)
+
+        return in_grad, kernel_grad, r_kernel_grad, b_grad
 
 class softmax_cross_entropy(operation):
     def __init__(self):
