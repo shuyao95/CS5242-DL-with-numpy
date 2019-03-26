@@ -1,5 +1,5 @@
 import numpy as np
-from utils.tools import img2col
+from utils.tools import *
 # Attension:
 # - Never change the value of input, which will change the result of backward
 
@@ -412,7 +412,8 @@ class dropout(operation):
             in_grad = out_grad
         return in_grad
 
-class RNNCell(operation):
+
+class RNNCellOp(operation):
     def __init__(self):
         """
         # Arguments
@@ -420,7 +421,7 @@ class RNNCell(operation):
             units: int, the number of hidden units
             initializer: Initializer class, to initialize weights
         """
-        super(RNNCell, self).__init__()
+        super(RNNCellOp, self).__init__()
 
     def forward(self, input, kernel, recurrent_kernel, bias):
         """
@@ -447,14 +448,17 @@ class RNNCell(operation):
                         gradients to state numpy array with shape (batch, units)]
         """
         x, prev_h = input
-        tanh_grad = np.nan_to_num(out_grad*(1-np.square(self.forward(input, kernel, recurrent_kernel, bias))))
-        
-        in_grad = [np.matmul(tanh_grad, kernel.T), np.matmul(tanh_grad, recurrent_kernel.T)]
+        tanh_grad = np.nan_to_num(
+            out_grad*(1-np.square(self.forward(input, kernel, recurrent_kernel, bias))))
+
+        in_grad = [np.matmul(tanh_grad, kernel.T), np.matmul(
+            tanh_grad, recurrent_kernel.T)]
         kernel_grad = np.matmul(np.nan_to_num(x.T), tanh_grad)
         r_kernel_grad = np.matmul(np.nan_to_num(prev_h.T), tanh_grad)
         b_grad = np.sum(tanh_grad, axis=0)
 
         return in_grad, kernel_grad, r_kernel_grad, b_grad
+
 
 class softmax_cross_entropy(operation):
     def __init__(self):

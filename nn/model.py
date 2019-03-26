@@ -66,14 +66,22 @@ class Model():
 
         new_params = optimizer.update(params, grads, iteration)
 
+        # for l, layer in enumerate(self.layers):
+        #     if layer.trainable:
+        #         w_key = 'layer-%dth:' % l + layer.name + '/weights'
+        #         b_key = 'layer-%dth:' % l + layer.name + '/bias'
+        #         layer_params = {
+        #             w_key: new_params[w_key],
+        #             b_key: new_params[b_key]
+        #         }
+        #         layer.update(layer_params)
         for l, layer in enumerate(self.layers):
             if layer.trainable:
-                w_key = 'layer-%dth:' % l + layer.name + '/weights'
-                b_key = 'layer-%dth:' % l + layer.name + '/bias'
-                layer_params = {
-                    w_key: new_params[w_key],
-                    b_key: new_params[b_key]
-                }
+                layer_params, _ = layer.get_params('layer-{}th'.format(l))
+                for k in layer_params.keys():
+                    layer_params[k] = new_params[k]
+                    assert ~np.any(
+                        np.isnan(layer_params[k])), '{} contains NaN'.format(k)
                 layer.update(layer_params)
 
     def train(self, dataset, train_batch=32, val_batch=1000, test_batch=1000, epochs=5, val_intervals=100, test_intervals=500, print_intervals=100):
@@ -118,7 +126,7 @@ class Model():
                     print('acc %.2f, loss %.2f' % (acc, loss), end='')
                     if self.regularization:
                         print(', reg loss %.2f' % reg_loss, end='')
-                    print(', speed %.2f imgs/sec' % (speed))
+                    print(', speed %.2f samples/sec' % (speed))
                     start = time.time()
 
         return np.array(train_results), np.array(val_results), np.array(test_results)

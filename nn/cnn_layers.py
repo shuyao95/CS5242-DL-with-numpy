@@ -1,12 +1,13 @@
 import numpy as np
 from utils.initializers import *
-from .operations import *
+from .operations import
 
 
 class Layer(object):
     """
     Layer abstraction
     """
+
     def __init__(self, name):
         """Initialization"""
         self.name = name

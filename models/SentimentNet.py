@@ -1,4 +1,3 @@
-from nn.cnn_layers import FCLayer
 from nn.rnn_layers import *
 from nn.model import Model
 from utils.initializers import *
