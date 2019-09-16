@@ -1,6 +1,5 @@
 import numpy as np
 
-
 # The first 3 functions in this file are from the Stanford cs231n course.
 
 def eval_numerical_gradient_inputs(layer, inputs, in_grads, h=1e-5):

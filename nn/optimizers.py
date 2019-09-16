@@ -71,12 +71,12 @@ class SGD(Optimizer):
         prev_moments = copy.deepcopy(self.moments)
         for k in list(xs.keys()):
             self.moments[k] = self.momentum * \
-                self.moments[k] - self.lr * xs_grads[k]
+                self.moments[k] + self.lr * xs_grads[k]
             if self.nesterov:
-                new_xs[k] = xs[k] - self.momentum * prev_moments[k] + \
+                new_xs[k] = xs[k] + self.momentum * prev_moments[k] - \
                     (1+self.momentum) * self.moments[k]
             else:
-                new_xs[k] = xs[k] + self.moments[k]
+                new_xs[k] = xs[k] - self.moments[k]
         return new_xs
 
 

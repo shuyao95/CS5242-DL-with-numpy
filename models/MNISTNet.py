@@ -1,4 +1,4 @@
-from nn.cnn_layers import *
+from nn.layers import *
 from nn.model import Model
 
 
@@ -34,20 +34,20 @@ def MNISTNet():
         'pad': 0
     }
     model = Model()
-    model.add(Convolution(conv1_params, name='conv1',
+    model.add(Conv2D(conv1_params, name='conv1',
                           initializer=Gaussian(std=0.001)))
     model.add(ReLU(name='relu1'))
-    model.add(Pooling(pool1_params, name='pooling1'))
-    model.add(Convolution(conv2_params, name='conv2',
+    model.add(Pool2D(pool1_params, name='pooling1'))
+    model.add(Conv2D(conv2_params, name='conv2',
                           initializer=Gaussian(std=0.001)))
     model.add(ReLU(name='relu2'))
-    model.add(Pooling(pool2_params, name='pooling2'))
+    model.add(Pool2D(pool2_params, name='pooling2'))
     # model.add(Dropout(ratio=0.25, name='dropout1'))
     model.add(Flatten(name='flatten'))
-    model.add(FCLayer(400, 256, name='fclayer1',
+    model.add(Linear(400, 256, name='fclayer1',
                       initializer=Gaussian(std=0.01)))
     model.add(ReLU(name='relu3'))
     # model.add(Dropout(ratio=0.5))
-    model.add(FCLayer(256, 10, name='fclayer2',
+    model.add(Linear(256, 10, name='fclayer2',
                       initializer=Gaussian(std=0.01)))
     return model

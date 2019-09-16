@@ -4,7 +4,7 @@ import pickle
 import sys
 import time
 
-from utils.tools import clip_gradients
+from nn.functional import clip_gradients
 
 
 class Model():

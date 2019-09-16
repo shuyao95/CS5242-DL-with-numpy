@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def eval_numerical_gradient_inputs(layer, inputs, in_grads, h=1e-5):
     single_input = False
     if not isinstance(inputs, list):
@@ -48,14 +47,12 @@ def eval_numerical_gradient_params(layer, inputs, in_grads, h=1e-5):
 
         while not it.finished:
             idx = it.multi_index
-
             oldval = v[idx]
             v[idx] = oldval + h
             pos = layer.forward(inputs).copy()
             v[idx] = oldval - h
             neg = layer.forward(inputs).copy()
             v[idx] = oldval
-
             grad[idx] = np.sum(np.nan_to_num(pos - neg) * in_grads) / (2 * h)
             it.iternext()
 

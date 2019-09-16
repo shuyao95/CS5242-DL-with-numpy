@@ -1,12 +1,14 @@
 import numpy as np
+
 from utils.tools import *
+from nn.functional import sigmoid, img2col
 # Attension:
 # - Never change the value of input, which will change the result of backward
 
 
-class operation(object):
+class operator(object):
     """
-    Operation abstraction
+    operator abstraction
     """
 
     def forward(self, input):
@@ -18,7 +20,7 @@ class operation(object):
         raise NotImplementedError
 
 
-class relu(operation):
+class relu(operator):
     def __init__(self):
         super(relu, self).__init__()
 
@@ -31,7 +33,7 @@ class relu(operation):
         return in_grad
 
 
-class flatten(operation):
+class flatten(operator):
     def __init__(self):
         super(flatten, self).__init__()
 
@@ -45,7 +47,7 @@ class flatten(operation):
         return in_grad
 
 
-class matmul(operation):
+class matmul(operator):
     def __init__(self):
         super(matmul, self).__init__()
 
@@ -63,7 +65,7 @@ class matmul(operation):
     def backward(self, out_grad, input, weights):
         """
         # Arguments
-            out_grad: gradient to the forward output of fc layer, with shape (batch, out_features)
+            out_grad: gradient to the forward output of linear layer, with shape (batch, out_features)
             input: numpy array with shape (batch, in_features)
             weights: numpy array with shape (in_features, out_features)
 
@@ -76,7 +78,7 @@ class matmul(operation):
         return in_grad, w_grad
 
 
-class add_bias(operation):
+class add_bias(operator):
     def __init__(self):
         super(add_bias, self).__init__()
 
@@ -94,7 +96,7 @@ class add_bias(operation):
     def backward(self, out_grad, input, bias):
         """
         # Arguments
-            out_grad: gradient to the forward output of fc layer, with shape (batch, out_features)
+            out_grad: gradient to the forward output of linear layer, with shape (batch, out_features)
             input: numpy array with shape (batch, in_features)
             bias: numpy array with shape (out_features)
         # Returns
@@ -106,9 +108,9 @@ class add_bias(operation):
         return in_grad, b_grad
 
 
-class fc(operation):
+class linear(operator):
     def __init__(self):
-        super(fc, self).__init__()
+        super(linear, self).__init__()
         self.matmul = matmul()
         self.add_bias = add_bias()
 
@@ -130,13 +132,13 @@ class fc(operation):
     def backward(self, out_grad, input, weights, bias):
         """
         # Arguments
-            out_grad: gradient to the forward output of fc layer, with shape (batch, out_features)
+            out_grad: gradient to the forward output of linear layer, with shape (batch, out_features)
             input: numpy array with shape (batch, in_features)
             weights: numpy array with shape (in_features, out_features)
             bias: numpy array with shape (out_features)
 
         # Returns
-            in_grad: gradient to the forward input of fc layer, with same shape as input
+            in_grad: gradient to the forward input of linear layer, with same shape as input
             w_grad: gradient to weights, with same shape as weights
             b_bias: gradient to bias, with same shape as bias
         """
@@ -148,7 +150,7 @@ class fc(operation):
         return in_grad, w_grad, b_grad
 
 
-class conv(operation):
+class conv(operator):
     def __init__(self, conv_params):
         """
         # Arguments
@@ -255,7 +257,7 @@ class conv(operation):
         return in_grad, w_grad, b_grad
 
 
-class pool(operation):
+class pool(operator):
     def __init__(self, pool_params):
         """
         # Arguments
@@ -362,7 +364,7 @@ class pool(operation):
         return in_grad
 
 
-class dropout(operation):
+class dropout(operator):
     def __init__(self, rate, training=True, seed=None):
         """
         # Arguments
@@ -413,7 +415,7 @@ class dropout(operation):
         return in_grad
 
 
-class RNNCellOp(operation):
+class vanilla_rnn(operator):
     def __init__(self):
         """
         # Arguments
@@ -421,7 +423,7 @@ class RNNCellOp(operation):
             units: int, the number of hidden units
             initializer: Initializer class, to initialize weights
         """
-        super(RNNCellOp, self).__init__()
+        super(vanilla_rnn, self).__init__()
 
     def forward(self, input, kernel, recurrent_kernel, bias):
         """
@@ -460,7 +462,97 @@ class RNNCellOp(operation):
         return in_grad, kernel_grad, r_kernel_grad, b_grad
 
 
-class softmax_cross_entropy(operation):
+class gru(operator):
+    def __init__(self):
+        """
+        # Arguments
+            in_features: int, the number of inputs features
+            units: int, the number of hidden units
+            initializer: Initializer class, to initialize weights
+        """
+        super(gru, self).__init__()
+
+    def forward(self, input, kernel, recurrent_kernel):
+        """
+        # Arguments
+            inputs: [input numpy array with shape (batch, in_features), 
+                    state numpy array with shape (batch, units)]
+
+        # Returns
+            outputs: numpy array with shape (batch, units)
+        """
+        x, prev_h = input
+        _, all_units = kernel.shape
+        units = all_units // 3
+        kernel_z, kernel_r, kernel_h = kernel[:, :units], kernel[:, units:2*units],  kernel[:, 2*units:all_units]
+        recurrent_kernel_z = recurrent_kernel[:, :units]
+        recurrent_kernel_r = recurrent_kernel[:, units:2*units]
+        recurrent_kernel_h = recurrent_kernel[:, 2*units:all_units]
+        # reset gate
+        x_r = sigmoid(x.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
+        # update gate
+        x_z = sigmoid(x.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
+        # new gate
+        x_h = np.tanh(x.dot(kernel_h) + np.dot(x_r * prev_h, recurrent_kernel_h))
+        
+        output = (1 - x_z) * x_h + x_z * prev_h
+        
+        return output
+
+    def backward(self, out_grad, input, kernel, recurrent_kernel):
+        """
+        # Arguments
+            in_grads: numpy array with shape (batch, units), gradients to outputs
+            inputs: [input numpy array with shape (batch, in_features), 
+                    state numpy array with shape (batch, units)], same with forward inputs
+
+        # Returns
+            out_grads: [gradients to input numpy array with shape (batch, in_features), 
+                        gradients to state numpy array with shape (batch, units)]
+        """
+        x, prev_h = input
+        _, all_units = kernel.shape
+        units = all_units // 3
+        kernel_z, kernel_r, kernel_h = kernel[:, :units], kernel[:, units:2*units],  kernel[:, 2*units:all_units]
+        recurrent_kernel_z = recurrent_kernel[:, :units]
+        recurrent_kernel_r = recurrent_kernel[:, units:2*units]
+        recurrent_kernel_h = recurrent_kernel[:, 2*units:all_units]
+        # reset gate
+        x_r = sigmoid(x.dot(kernel_r) + prev_h.dot(recurrent_kernel_r))
+        # update gate
+        x_z = sigmoid(x.dot(kernel_z) + prev_h.dot(recurrent_kernel_z))
+        # new gate
+        x_h = np.tanh(x.dot(kernel_h) + np.dot(x_r * prev_h, recurrent_kernel_h))
+        output = (1 - x_z) * x_h + x_z * prev_h
+
+        sig_grad_xr = x_r * (1 - x_r)
+        sig_grad_xz = x_z * (1 - x_z)
+        tanh_grad_xh = (1 - np.square(x_h))
+
+        x_grad = (out_grad * (prev_h - x_h) * sig_grad_xz).dot(kernel_z.T) + \
+            (out_grad * (1 - x_z) * tanh_grad_xh).dot(kernel_h.T) + \
+            ((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr).dot(kernel_r.T)
+
+        prev_h_grad = out_grad * x_z + (out_grad * (prev_h - x_h) * sig_grad_xz).dot(recurrent_kernel_z.T) + \
+            (out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * x_r + \
+            ((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr).dot(recurrent_kernel_r.T)
+
+        kernel_r_grad = x.T.dot((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr)
+        kernel_z_grad = x.T.dot(out_grad * (prev_h - x_h) * sig_grad_xz)
+        kernel_h_grad = x.T.dot(out_grad * (1 - x_z) * tanh_grad_xh)
+
+        recurrent_kernel_r_grad = prev_h.T.dot((out_grad * (1 - x_z) * tanh_grad_xh).dot(recurrent_kernel_h.T) * prev_h * sig_grad_xr)
+        recurrent_kernel_z_grad = prev_h.T.dot(out_grad * (prev_h - x_h) * sig_grad_xz)
+        recurrent_kernel_h_grad = (x_r * prev_h).T.dot(out_grad * (1 - x_z) * tanh_grad_xh)
+
+        in_grad = [x_grad, prev_h_grad]
+        kernel_grad = np.concatenate([kernel_z_grad, kernel_r_grad, kernel_h_grad], axis=-1)
+        r_kernel_grad = np.concatenate([recurrent_kernel_z_grad, recurrent_kernel_r_grad, recurrent_kernel_h_grad], axis=-1)
+
+        return in_grad, kernel_grad, r_kernel_grad
+
+
+class softmax_cross_entropy(operator):
     def __init__(self):
         super(softmax_cross_entropy, self).__init__()
 
@@ -510,3 +602,5 @@ class softmax_cross_entropy(operation):
         in_grad[np.arange(batch), labels] -= 1
         in_grad /= batch
         return in_grad
+
+        

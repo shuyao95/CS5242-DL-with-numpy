@@ -1,5 +1,5 @@
 import numpy as np
-from .operations import softmax_cross_entropy
+from nn.operators import softmax_cross_entropy
 
 
 class Loss(object):

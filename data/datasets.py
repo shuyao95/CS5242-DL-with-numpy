@@ -2,7 +2,6 @@
 MNIST handwritten digits dataset.
 
 """
-
 import numpy as np
 import os
 import wget

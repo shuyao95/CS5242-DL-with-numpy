@@ -1,6 +1,6 @@
 import numpy as np
-from .operations import *
-from utils.initializers import *
+from nn.initializers import *
+from nn.operators import *
 
 
 class Layer(object):
@@ -39,8 +39,12 @@ class Layer(object):
         return None
 
 
-class FCLayer(Layer):
-    def __init__(self, in_features, out_features, name='fclayer', initializer=Gaussian()):
+####################################################################################
+# following layers are mainly for RNN
+
+
+class Linear(Layer):
+    def __init__(self, in_features, out_features, name='linear', initializer=Gaussian()):
         """Initialization
 
         # Arguments
@@ -48,7 +52,9 @@ class FCLayer(Layer):
             out_features: int, the numbet of required output features
             initializer: Initializer class, to initialize weights
         """
-        super(FCLayer, self).__init__(name=name)
+        super(Linear, self).__init__(name=name)
+        self.linear = linear()
+
         self.trainable = True
 
         self.weights = initializer.initialize((in_features, out_features))
@@ -58,36 +64,12 @@ class FCLayer(Layer):
         self.b_grad = np.zeros(self.bias.shape)
 
     def forward(self, input):
-        """Forward pass
-
-        # Arguments
-            input: numpy array with shape (batch, ..., in_features),
-            typically (batch, in_features), or (batch, T, in_features) for sequencical data
-
-        # Returns
-            output: numpy array with shape (batch, ..., out_features)
-        """
-        batch = input.shape[0]
-        b_reshaped = self.bias.reshape(
-            (1,) * (input.ndim - 1) + self.bias.shape)
-        output = np.dot(input, self.weights) + b_reshaped
+        output = self.linear.forward(input, self.weights, self.bias)
         return output
 
     def backward(self, out_grad, input):
-        """Backward pass, store gradients to self.weights into self.w_grad and store gradients to self.bias into self.b_grad
-
-        # Arguments
-            out_grad: numpy array with shape (batch, ..., out_features), gradients to output
-            input: numpy array with shape (batch, ..., in_features), same with forward input
-
-        # Returns
-            in_grad: numpy array with shape (batch, ..., in_features), gradients to input
-        """
-        dot_axes = np.arange(input.ndim - 1)
-        self.w_grad = np.tensordot(np.nan_to_num(
-            input), out_grad, axes=(dot_axes, dot_axes))
-        self.b_grad = np.sum(out_grad, axis=tuple(dot_axes))
-        in_grad = np.dot(out_grad, self.weights.T)
+        in_grad, self.w_grad, self.b_grad = self.linear.backward(
+            out_grad, input, self.weights, self.bias)
         return in_grad
 
     def update(self, params):
@@ -106,15 +88,296 @@ class FCLayer(Layer):
                 self.bias = v
 
     def get_params(self, prefix):
-        """Return parameters (self.weights and self.bias) as well as gradients (self.w_grad and self.b_grad)
+        """Return parameters (self.weights and self.bias) as well as gradient (self.w_grad and self.b_grad)
 
         # Arguments
             prefix: string, to contruct prefix of keys in the dictionary (usually is the layer-ith)
 
         # Returns
             params: dictionary, store parameters of this layer, one key contains 'weights' and the other contains 'bias'
-            grads: dictionary, store gradients of this layer, one key contains 'weights' and the other contains 'bias'
+            grads: dictionary, store gradient of this layer, one key contains 'weights' and the other contains 'bias'
 
+            None: if not trainable
+        """
+        if self.trainable:
+            params = {
+                prefix+':'+self.name+'/weights': self.weights,
+                prefix+':'+self.name+'/bias': self.bias
+            }
+            grads = {
+                prefix+':'+self.name+'/weights': self.w_grad,
+                prefix+':'+self.name+'/bias': self.b_grad
+            }
+            return params, grads
+        else:
+            return None
+
+
+class Conv2D(Layer):
+    def __init__(self, conv_params, initializer=Gaussian(), name='conv'):
+        """Initialization
+
+        # Arguments
+            conv_params: dictionary, containing these parameters:
+                'kernel_h': The height of kernel.
+                'kernel_w': The width of kernel.
+                'stride': The number of pixels between adjacent receptive fields in the horizontal and vertical directions.
+                'pad': The number of pixels padded to the bottom, top, left and right of each feature map. Here, pad=2 means a 2-pixel border of padded with zeros
+                'in_channel': The number of input channels.
+                'out_channel': The number of output channels.
+            initializer: Initializer class, to initialize weights
+        """
+        super(Conv2D, self).__init__(name=name)
+        self.conv_params = conv_params
+        self.conv = conv(conv_params)
+
+        self.trainable = True
+
+        self.weights = initializer.initialize(
+            (conv_params['out_channel'], conv_params['in_channel'], conv_params['kernel_h'], conv_params['kernel_w']))
+        self.bias = np.zeros((conv_params['out_channel']))
+
+        self.w_grad = np.zeros(self.weights.shape)
+        self.b_grad = np.zeros(self.bias.shape)
+
+    def forward(self, input):
+        output = self.conv.forward(input, self.weights, self.bias)
+        return output
+
+    def backward(self, out_grad, input):
+        in_grad, self.w_grad, self.b_grad = self.conv.backward(
+            out_grad, input, self.weights, self.bias)
+        return in_grad
+
+    def update(self, params):
+        """Update parameters (self.weights and self.bias) with new params
+
+        # Arguments
+            params: dictionary, one key contains 'weights' and the other contains 'bias'
+
+        # Returns
+            none
+        """
+        for k, v in params.items():
+            if 'weights' in k:
+                self.weights = v
+            else:
+                self.bias = v
+
+    def get_params(self, prefix):
+        """Return parameters (self.weights and self.bias) as well as gradient (self.w_grad and self.b_grad)
+
+        # Arguments
+            prefix: string, to contruct prefix of keys in the dictionary (usually is the layer-ith)
+
+        # Returns
+            params: dictionary, store parameters of this layer, one key contains 'weights' and the other contains 'bias'
+            grads: dictionary, store gradient of this layer, one key contains 'weights' and the other contains 'bias'
+
+            None: if not trainable
+        """
+        if self.trainable:
+            params = {
+                prefix+':'+self.name+'/weights': self.weights,
+                prefix+':'+self.name+'/bias': self.bias
+            }
+            grads = {
+                prefix+':'+self.name+'/weights': self.w_grad,
+                prefix+':'+self.name+'/bias': self.b_grad
+            }
+            return params, grads
+        else:
+            return None
+
+
+class ReLU(Layer):
+    def __init__(self, name='relu'):
+        """Initialization
+        """
+        super(ReLU, self).__init__(name=name)
+        self.relu = relu()
+
+    def forward(self, input):
+        """Forward pass
+
+        # Arguments
+            input: numpy array
+
+        # Returns
+            output: numpy array
+        """
+        output = self.relu.forward(input)
+        return output
+
+    def backward(self, out_grad, input):
+        """Backward pass
+
+        # Arguments
+            out_grad: numpy array, gradient to output
+            input: numpy array, same with forward input
+
+        # Returns
+            in_grad: numpy array, gradient to input 
+        """
+        in_grad = self.relu.backward(out_grad, input)
+        return in_grad
+
+
+class Pool2D(Layer):
+    def __init__(self, pool_params, name='pooling'):
+        """Initialization
+
+        # Arguments
+            pool_params is a dictionary, containing these parameters:
+                'pool_type': The type of pooling, 'max' or 'avg'
+                'pool_h': The height of pooling kernel.
+                'pool_w': The width of pooling kernel.
+                'stride': The number of pixels between adjacent receptive fields in the horizontal and vertical directions.
+                'pad': The number of pixels that will be used to zero-pad the input in each x-y direction. Here, pad=2 means a 2-pixel border of padding with zeros.
+        """
+        super(Pool2D, self).__init__(name=name)
+        self.pool_params = pool_params
+        self.pool = pool(pool_params)
+
+    def forward(self, input):
+        output = self.pool.forward(input)
+        return output
+
+    def backward(self, out_grad, input):
+        in_grad = self.pool.backward(out_grad, input)
+        return in_grad
+
+
+class Dropout(Layer):
+    def __init__(self, rate, name='dropout', seed=None):
+        """Initialization
+
+        # Arguments
+            rate: float [0, 1], the probability of setting a neuron to zero
+            seed: int, random seed to sample from input, so as to get mask, which is convenient to check gradients. But for real training, it should be None to make sure to randomly drop neurons
+        """
+        super(Dropout, self).__init__(name=name)
+        self.rate = rate
+        self.seed = seed
+        self.dropout = dropout(rate, self.training, seed)
+
+    def forward(self, input):
+        output = self.dropout.forward(input)
+        return output
+
+    def backward(self, out_grad, input):
+        in_grad = self.dropout.backward(out_grad, input)
+        return in_grad
+
+    def set_mode(self, training):
+        """Set the phrase/mode into training (True) or tesing (False)"""
+        self.training = training
+        self.dropout.training = training
+
+
+class Flatten(Layer):
+    def __init__(self, name='flatten', seed=None):
+        """Initialization
+        """
+        super(Flatten, self).__init__(name=name)
+        self.flatten = flatten()
+
+    def forward(self, input):
+        """Forward pass
+
+        # Arguments
+            input: numpy array with shape (batch, in_channel, in_height, in_width)
+
+        # Returns
+            output: numpy array with shape (batch, in_channel*in_height*in_width)
+        """
+        output = self.flatten.forward(input)
+        return output
+
+    def backward(self, out_grad, input):
+        """Backward pass
+
+        # Arguments
+            out_grad: numpy array with shape (batch, in_channel*in_height*in_width), gradient to output
+            input: numpy array with shape (batch, in_channel, in_height, in_width), same with forward input
+
+        # Returns
+            in_grad: numpy array with shape (batch, in_channel, in_height, in_width), gradient to input 
+        """
+        in_grad = self.flatten.backward(out_grad, input)
+        return in_grad
+
+
+####################################################################################
+# following layers are for RNN
+
+
+class Linear2D(Layer):
+    def __init__(self, in_features, out_features, name='linear2d', initializer=Gaussian()):
+        """Initialization
+        # Arguments
+            in_features: int, the number of input features
+            out_features: int, the numbet of required output features
+            initializer: Initializer class, to initialize weights
+        """
+        super(Linear2D, self).__init__(name=name)
+        self.trainable = True
+
+        self.weights = initializer.initialize((in_features, out_features))
+        self.bias = np.zeros(out_features)
+
+        self.w_grad = np.zeros(self.weights.shape)
+        self.b_grad = np.zeros(self.bias.shape)
+
+    def forward(self, input):
+        """Forward pass
+        # Arguments
+            input: numpy array with shape (batch, ..., in_features),
+            typically (batch, in_features), or (batch, T, in_features) for sequencical data
+        # Returns
+            output: numpy array with shape (batch, ..., out_features)
+        """
+        batch = input.shape[0]
+        b_reshaped = self.bias.reshape(
+            (1,) * (input.ndim - 1) + self.bias.shape)
+        output = np.dot(input, self.weights) + b_reshaped
+        return output
+
+    def backward(self, out_grad, input):
+        """Backward pass, store gradients to self.weights into self.w_grad and store gradients to self.bias into self.b_grad
+        # Arguments
+            out_grad: numpy array with shape (batch, ..., out_features), gradients to output
+            input: numpy array with shape (batch, ..., in_features), same with forward input
+        # Returns
+            in_grad: numpy array with shape (batch, ..., in_features), gradients to input
+        """
+        dot_axes = np.arange(input.ndim - 1)
+        self.w_grad = np.tensordot(np.nan_to_num(
+            input), out_grad, axes=(dot_axes, dot_axes))
+        self.b_grad = np.sum(out_grad, axis=tuple(dot_axes))
+        in_grad = np.dot(out_grad, self.weights.T)
+        return in_grad
+
+    def update(self, params):
+        """Update parameters (self.weights and self.bias) with new params
+        # Arguments
+            params: dictionary, one key contains 'weights' and the other contains 'bias'
+        # Returns
+            none
+        """
+        for k, v in params.items():
+            if 'weights' in k:
+                self.weights = v
+            else:
+                self.bias = v
+
+    def get_params(self, prefix):
+        """Return parameters (self.weights and self.bias) as well as gradients (self.w_grad and self.b_grad)
+        # Arguments
+            prefix: string, to contruct prefix of keys in the dictionary (usually is the layer-ith)
+        # Returns
+            params: dictionary, store parameters of this layer, one key contains 'weights' and the other contains 'bias'
+            grads: dictionary, store gradients of this layer, one key contains 'weights' and the other contains 'bias'
             None: if not trainable
         """
         if self.trainable:
@@ -182,7 +445,7 @@ class TemporalPooling(Layer):
         return in_grad
 
 
-class RNNCell(Layer):
+class VanillaRNNCell(Layer):
     "Only for testing the  backward of onestep rnn"
 
     def __init__(self, in_features, units, name='rnn_cell', initializer=Gaussian()):
@@ -192,9 +455,9 @@ class RNNCell(Layer):
             units: int, the number of hidden units
             initializer: Initializer class, to initialize weights
         """
-        super(RNNCell, self).__init__(name=name)
+        super(VanillaRNNCell, self).__init__(name=name)
         self.trainable = True
-        self.cell = RNNCellOp()
+        self.cell = vanilla_rnn()
 
         self.kernel = initializer.initialize((in_features, units))
         self.recurrent_kernel = initializer.initialize((units, units))
@@ -271,7 +534,7 @@ class RNNCell(Layer):
             return None
 
 
-class RNN(Layer):
+class VanillaRNN(Layer):
     def __init__(self, in_features, units, h0=None, name='rnn', initializer=Gaussian()):
         """
         # Arguments
@@ -279,9 +542,9 @@ class RNN(Layer):
             units: int, the number of hidden units
             h0: default initial state, numpy array with shape (units,)
         """
-        super(RNN, self).__init__(name=name)
+        super(VanillaRNN, self).__init__(name=name)
         self.trainable = True
-        self.cell = RNNCellOp()  # it's operation instead of layer
+        self.cell = vanilla_rnn()  # it's operation instead of layer
 
         self.kernel = initializer.initialize((in_features, units))
         self.recurrent_kernel = initializer.initialize((units, units))
@@ -369,7 +632,182 @@ class RNN(Layer):
             return None
 
 
-class BidirectionalRNN(Layer):
+class GRUCell(Layer):
+    "Only for testing the  backward of onestep gru"
+
+    def __init__(self, in_features, units, name='gru_cell', initializer=Gaussian()):
+        """
+        # Arguments
+            in_features: int, the number of input features
+            units: int, the number of hidden units
+            initializer: Initializer class, to initialize weights
+        """
+        super(GRUCell, self).__init__(name=name)
+        self.trainable = True
+        self.cell = gru()
+
+        self.kernel = initializer.initialize((in_features, 3 * units))
+        self.recurrent_kernel = initializer.initialize((units, 3 * units))
+
+        self.kernel_grad = np.zeros(self.kernel.shape)
+        self.r_kernel_grad = np.zeros(self.recurrent_kernel.shape)
+
+    def forward(self, input):
+        """
+        # Arguments
+            input: [input numpy array with shape (batch, in_features),
+                    state numpy array with shape (batch, units)]
+
+        # Returns
+            output: numpy array with shape (batch, units)
+        """
+        output = self.cell.forward(input, self.kernel, self.recurrent_kernel)
+        return output
+
+    def backward(self, out_grad, input):
+        """
+        # Arguments
+            out_grad: numpy array with shape (batch, units), gradients to output
+            input: [input numpy array with shape (batch, in_features),
+                    state numpy array with shape (batch, units)], same with forward input
+
+        # Returns
+            in_grad: [gradients to input numpy array with shape (batch, in_features),
+                        gradients to state numpy array with shape (batch, units)]
+        """
+        in_grad, self.kernel_grad, self.r_kernel_grad= self.cell.backward(
+            out_grad, input, self.kernel, self.recurrent_kernel)
+        return in_grad
+
+    def update(self, params):
+        """Update parameters with new params
+        """
+        for k, v in params.items():
+            if '/kernel' in k:
+                self.kernel = v
+            elif '/recurrent_kernel' in k:
+                self.recurrent_kernel = v
+
+    def get_params(self, prefix):
+        """Return parameters and gradients
+
+        # Arguments
+            prefix: string, to contruct prefix of keys in the dictionary (usually is the layer-ith)
+
+        # Returns
+            params: dictionary, store parameters of this layer
+            grads: dictionary, store gradients of this layer
+
+            None: if not trainable
+        """
+        if self.trainable:
+            params = {
+                prefix + ':' + self.name + '/kernel': self.kernel,
+                prefix + ':' + self.name + '/recurrent_kernel': self.recurrent_kernel,
+            }
+            grads = {
+                prefix + ':' + self.name + '/kernel': self.kernel_grad,
+                prefix + ':' + self.name + '/recurrent_kernel': self.r_kernel_grad,
+            }
+            return params, grads
+        else:
+            return None
+
+
+class GRU(Layer):
+    def __init__(self, in_features, units, h0=None, name='gru', initializer=Gaussian()):
+        """
+        # Arguments
+            in_features: int, the number of input features
+            units: int, the number of hidden units
+            h0: default initial state, numpy array with shape (units,)
+        """
+        super(GRU, self).__init__(name=name)
+        self.trainable = True
+        self.cell = gru()  # it's operation instead of layer
+
+        self.kernel = initializer.initialize((in_features, 3 * units))
+        self.recurrent_kernel = initializer.initialize((units, 3 * units))
+
+        if h0 is None:
+            self.h0 = np.zeros(units)
+        else:
+            self.h0 = h0
+
+        self.kernel_grad = np.zeros(self.kernel.shape)
+        self.r_kernel_grad = np.zeros(self.recurrent_kernel.shape)
+
+    def forward(self, input):
+        output = []
+        h = self.h0
+        for t in range(input.shape[1]):
+            out = self.cell.forward(
+                [input[:, t, :], h], self.kernel, self.recurrent_kernel)
+            output.append(out)
+            h = out
+        output = np.stack(output, axis=1)
+        return output
+
+    def backward(self, out_grad, input):
+        output = self.forward(input)
+
+        in_grad = []
+        h_grad = np.zeros_like(self.h0)
+
+        self.kernel_grad[:] = 0
+        self.r_kernel_grad[:] = 0
+        for t in range(input.shape[1]-1, -1, -1):
+            if t == 0:
+                # to construct the h0 for batches
+                h = np.ones((input.shape[0], 1)).dot(self.h0[None, :])
+            else:
+                h = output[:, t-1, :]
+            grad, kernel_grad, r_kernel_grad = self.cell.backward(
+                out_grad[:, t, :]+h_grad, [input[:, t, :], h], self.kernel, self.recurrent_kernel)
+            self.kernel_grad += kernel_grad
+            self.r_kernel_grad += r_kernel_grad
+            in_grad.append(grad[0])
+            h_grad = grad[1]
+        in_grad = np.stack(in_grad, axis=1)
+        in_grad = in_grad[:, ::-1, :]
+        return in_grad
+
+    def update(self, params):
+        """Update parameters with new params
+        """
+        for k, v in params.items():
+            if '/kernel' in k:
+                self.kernel = v
+            elif '/recurrent_kernel' in k:
+                self.recurrent_kernel = v
+
+    def get_params(self, prefix):
+        """Return parameters and gradients
+
+        # Arguments
+            prefix: string, to contruct prefix of keys in the dictionary (usually is the layer-ith)
+
+        # Returns
+            params: dictionary, store parameters of this layer
+            grads: dictionary, store gradients of this layer
+
+            None: if not trainable
+        """
+        if self.trainable:
+            params = {
+                prefix+':'+self.name+'/kernel': self.kernel,
+                prefix+':'+self.name+'/recurrent_kernel': self.recurrent_kernel,
+            }
+            grads = {
+                prefix+':'+self.name+'/kernel': self.kernel_grad,
+                prefix+':'+self.name+'/recurrent_kernel': self.r_kernel_grad,
+            }
+            return params, grads
+        else:
+            return None
+
+
+class BiRNN(Layer):
     """ Bi-directional RNN in Concatenating Mode
     """
 
@@ -382,11 +820,11 @@ class BidirectionalRNN(Layer):
             h0: default initial state for forward phase, numpy array with shape (units,)
             hr: default initial state for backward phase, numpy array with shape (units,)
         """
-        super(BidirectionalRNN, self).__init__(name=name)
+        super(BiRNN, self).__init__(name=name)
         self.trainable = True
-        self.forward_rnn = RNN(in_features, units, h0,
+        self.forward_rnn = VanillaRNN(in_features, units, h0,
                                'forward_rnn', initializer=initializer)
-        self.backward_rnn = RNN(in_features, units, hr,
+        self.backward_rnn = VanillaRNN(in_features, units, hr,
                                 'backward_rnn', initializer=initializer)
 
     def _reverse_temporal_data(self, x, mask):
@@ -498,3 +936,4 @@ class BidirectionalRNN(Layer):
             return params, grads
         else:
             return None
+
