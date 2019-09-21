@@ -7,3 +7,6 @@ def rel_error(x, y):
     rel_error = np.sum(np.nan_to_num(rel_error)) / np.sum(~np.isnan(rel_error))
 
     return rel_error
+
+def warn(*args, **kwargs):
+    pass

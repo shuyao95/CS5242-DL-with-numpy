@@ -158,7 +158,7 @@ class conv(operator):
                 'kernel_h': The height of kernel.
                 'kernel_w': The width of kernel.
                 'stride': The number of pixels between adjacent receptive fields in the horizontal and vertical directions.
-                'pad': The number of pixels padded to the bottom, top, left and right of each feature map. Here, pad = 2 means a 2-pixel border of padded with zeros
+                'pad': The total number of 0s to be added along the height (or width) dimension; half of the 0s are added on the top (or left) and half at the bottom (or right). we will only test even numbers.
                 'in_channel': The number of input channels.
                 'out_channel': The number of output channels.
         """
@@ -183,11 +183,12 @@ class conv(operator):
         out_channel = self.conv_params['out_channel']
 
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - kernel_h + 2*pad) // stride
-        out_width = 1 + (in_width - kernel_w + 2*pad) // stride
+        out_height = 1 + (in_height - kernel_h + pad) // stride
+        out_width = 1 + (in_width - kernel_w + pad) // stride
         output = np.zeros((batch, out_channel, out_height, out_width))
 
-        input_pad = np.pad(input, pad_width=(pad,),
+        pad_scheme = (pad//2, pad - pad//2)
+        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
                            mode='constant', constant_values=0)
 
         # get initial nodes of receptive fields in height and width direction
@@ -223,11 +224,13 @@ class conv(operator):
         out_channel = self.conv_params['out_channel']
 
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - kernel_h + 2*pad) // stride
-        out_width = 1 + (in_width - kernel_w + 2*pad) // stride
+        out_height = 1 + (in_height - kernel_h + pad) // stride
+        out_width = 1 + (in_width - kernel_w + pad) // stride
 
-        input_pad = np.pad(input, pad_width=(pad,),
+        pad_scheme = (pad//2, pad - pad//2)
+        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
                            mode='constant', constant_values=0)
+                           
         # get initial nodes of receptive fields in height and width direction
         recep_fields_h = [stride*i for i in range(out_height)]
         recep_fields_w = [stride*i for i in range(out_width)]
@@ -266,7 +269,7 @@ class pool(operator):
                 'pool_h': The height of pooling kernel.
                 'pool_w': The width of pooling kernel.
                 'stride': The number of pixels between adjacent receptive fields in the horizontal and vertical directions.
-                'pad': The number of pixels that will be used to zero-pad the input in each x-y direction. Here, pad = 2 means a 2-pixel border of padding with zeros.
+                'pad': The total number of 0s to be added along the height (or width) dimension; half of the 0s are added on the top (or left) and half at the bottom (or right). we will only test even numbers.
         """
         super(pool, self).__init__()
         self.pool_params = pool_params
@@ -286,11 +289,11 @@ class pool(operator):
         pad = self.pool_params['pad']
 
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - pool_height + 2*pad) // stride
-        out_width = 1 + (in_width - pool_width +
-                         2*pad) // stride
+        out_height = 1 + (in_height - pool_height + pad) // stride
+        out_width = 1 + (in_width - pool_width + pad) // stride
 
-        input_pad = np.pad(input, pad_width=(pad,),
+        pad_scheme = (pad//2, pad - pad//2)
+        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
                            mode='constant', constant_values=0)
 
         recep_fields_h = [stride*i for i in range(out_height)]
@@ -305,8 +308,7 @@ class pool(operator):
         elif pool_type == 'avg':
             output = np.average(input_pool, axis=2)
         else:
-            raise ValueError('Doesn\'t support \'%s\' pooling.' %
-                             pool_type)
+            raise ValueError('Doesn\'t support \'%s\' pooling.' % pool_type)
         return output
 
     def backward(self, out_grad, input):
@@ -325,10 +327,11 @@ class pool(operator):
         pad = self.pool_params['pad']
 
         batch, in_channel, in_height, in_width = input.shape
-        out_height = 1 + (in_height - pool_height + 2*pad) // stride
-        out_width = 1 + (in_width - pool_width + 2*pad) // stride
+        out_height = 1 + (in_height - pool_height + pad) // stride
+        out_width = 1 + (in_width - pool_width + pad) // stride
 
-        input_pad = np.pad(input, pad_width=(pad,),
+        pad_scheme = (pad//2, pad - pad//2)
+        input_pad = np.pad(input, pad_width=((0,0), (0,0), pad_scheme, pad_scheme),
                            mode='constant', constant_values=0)
 
         recep_fields_h = [stride*i for i in range(out_height)]

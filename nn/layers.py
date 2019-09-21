@@ -122,7 +122,7 @@ class Conv2D(Layer):
                 'kernel_h': The height of kernel.
                 'kernel_w': The width of kernel.
                 'stride': The number of pixels between adjacent receptive fields in the horizontal and vertical directions.
-                'pad': The number of pixels padded to the bottom, top, left and right of each feature map. Here, pad=2 means a 2-pixel border of padded with zeros
+                'pad': The total number of 0s to be added along the height (or width) dimension; half of the 0s are added on the top (or left) and half at the bottom (or right). we will only test even numbers.
                 'in_channel': The number of input channels.
                 'out_channel': The number of output channels.
             initializer: Initializer class, to initialize weights
@@ -233,7 +233,7 @@ class Pool2D(Layer):
                 'pool_h': The height of pooling kernel.
                 'pool_w': The width of pooling kernel.
                 'stride': The number of pixels between adjacent receptive fields in the horizontal and vertical directions.
-                'pad': The number of pixels that will be used to zero-pad the input in each x-y direction. Here, pad=2 means a 2-pixel border of padding with zeros.
+                'pad': The total number of 0s to be added along the height (or width) dimension; half of the 0s are added on the top (or left) and half at the bottom (or right). we will only test even numbers.
         """
         super(Pool2D, self).__init__(name=name)
         self.pool_params = pool_params
@@ -568,7 +568,8 @@ class VanillaRNN(Layer):
             output: numpy array with shape (batch, timestamp, units)
         """
         output = []
-        h = self.h0
+        batch, _, _ = input.shape
+        h = np.repeat(self.h0[None,:], batch, axis=0)
         for t in range(input.shape[1]):
             out = self.cell.forward(
                 [input[:, t, :], h], self.kernel, self.recurrent_kernel, self.bias)
@@ -588,7 +589,8 @@ class VanillaRNN(Layer):
         """
         output = self.forward(input)
         in_grad = []
-        h_grad = np.zeros_like(self.h0)
+        h_grad = np.zeros_like(self.h0) # will be broadcast during backpropogation
+
         self.kernel_grad[:] = 0
         self.r_kernel_grad[:] = 0
         self.b_grad[:] = 0
@@ -761,7 +763,8 @@ class GRU(Layer):
             output: numpy array with shape (batch, timestamp, units)
         """
         output = []
-        h = self.h0
+        batch, _, _ = input.shape
+        h = np.repeat(self.h0[None,:], batch, axis=0)
         for t in range(input.shape[1]):
             out = self.cell.forward(
                 [input[:, t, :], h], self.kernel, self.recurrent_kernel)
@@ -780,9 +783,8 @@ class GRU(Layer):
             in_grad: gradient to forward pass input with shape (batch, timestamp, in_features)
         """
         output = self.forward(input)
-
         in_grad = []
-        h_grad = np.zeros_like(self.h0)
+        h_grad = np.zeros_like(self.h0) # will be broadcast during backpropogation
 
         self.kernel_grad[:] = 0
         self.r_kernel_grad[:] = 0
