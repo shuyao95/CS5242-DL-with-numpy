@@ -2,6 +2,10 @@ import numpy as np
 
 # The first 3 functions in this file are from the Stanford cs231n course.
 
+# In gradient checking, to get an approximate gradient for a parameter, we vary that parameter by a small amount (while keeping rest of parameters constant) and note the difference in the network loss. Dividing the difference in network loss by the amount we varied the parameter gives us an approximation for the gradient. We repeat this process for all the other parameters to obtain our numerical gradient. Note that gradient checking is a slow process (2 forward propagations per parameter) and should only be used to check your backpropagation!
+
+# More links on gradient checking: http://ufldl.stanford.edu/tutorial/supervised/DebuggingGradientChecking/,  https://www.coursera.org/learn/machine-learning/lecture/Y3s6r/gradient-checking
+
 def eval_numerical_gradient_inputs(layer, inputs, in_grads, h=1e-5):
     grads = np.zeros_like(inputs)
     it = np.nditer(inputs, flags=['multi_index'], op_flags=['readwrite'])
