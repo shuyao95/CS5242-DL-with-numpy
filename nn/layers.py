@@ -560,6 +560,13 @@ class VanillaRNN(Layer):
         self.b_grad = np.zeros(self.bias.shape)
 
     def forward(self, input):
+        """
+        # Arguments
+            input: input numpy array with shape (batch, timestamp, in_features)
+
+        # Returns
+            output: numpy array with shape (batch, timestamp, units)
+        """
         output = []
         h = self.h0
         for t in range(input.shape[1]):
@@ -571,6 +578,14 @@ class VanillaRNN(Layer):
         return output
 
     def backward(self, out_grad, input):
+        """
+        # Arguments
+            out_grad: gradient to forward pass output with shape (batch, timestamp, units)
+            input: input numpy array with shape (batch, timestamp, in_features)
+
+        # Returns
+            in_grad: gradient to forward pass input with shape (batch, timestamp, in_features)
+        """
         output = self.forward(input)
         in_grad = []
         h_grad = np.zeros_like(self.h0)
@@ -738,6 +753,13 @@ class GRU(Layer):
         self.r_kernel_grad = np.zeros(self.recurrent_kernel.shape)
 
     def forward(self, input):
+        """
+        # Arguments
+            input: input numpy array with shape (batch, timestamp, in_features)
+
+        # Returns
+            output: numpy array with shape (batch, timestamp, units)
+        """
         output = []
         h = self.h0
         for t in range(input.shape[1]):
@@ -749,6 +771,14 @@ class GRU(Layer):
         return output
 
     def backward(self, out_grad, input):
+        """
+        # Arguments
+            out_grad: gradient to forward pass output with shape (batch, timestamp, units)
+            input: input numpy array with shape (batch, timestamp, in_features)
+
+        # Returns
+            in_grad: gradient to forward pass input with shape (batch, timestamp, in_features)
+        """
         output = self.forward(input)
 
         in_grad = []

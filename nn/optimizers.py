@@ -32,52 +32,44 @@ class Optimizer():
 
 class SGD(Optimizer):
 
-    def __init__(self, lr=0.01, momentum=0, decay=0, nesterov=False, sheduler_func=None):
+    def __init__(self, lr=0.01, beta=0, decay=0, sheduler_func=None):
         """Initialization
 
         # Arguments
             lr: float, learnig rate 
-            momentum: float, the ratio of moments
+            beta: float, the ratio of momentum
             decay: float, the learning rate decay ratio
         """
         super(SGD, self).__init__(lr)
-        self.momentum = momentum
-        self.moments = None
+        self.beta = beta
+        self.momentum = None
         self.decay = decay
-        self.nesterov = nesterov
         self.sheduler_func = sheduler_func
 
-    def update(self, xs, xs_grads, iteration):
+    def update(self, w, w_grads, iteration):
         """Initialization
 
         # Arguments
-            xs: dictionary, all weights of model
-            xs_grads: dictionary, gradients to all weights of model, same keys with xs
+            w: dictionary, all weights of model
+            w_grads: dictionary, gradients to all weights of model, same keys with w
             iteration: int, current iteration number in the whole training process (not in that epoch)
 
         # Returns
-            new_xs: dictionary, new weights of model
+            new_w: dictionary, new weights of model
         """
-        new_xs = {}
+        new_w = {}
         if self.decay > 0:
             self.lr *= (1/(1+self.decay*iteration))
         if self.sheduler_func:
             self.lr = self.sheduler(self.sheduler_func, iteration)
-            # print(self.lr)
-        if not self.moments:
-            self.moments = {}
-            for k, v in xs_grads.items():
-                self.moments[k] = np.zeros(v.shape)
-        prev_moments = copy.deepcopy(self.moments)
-        for k in list(xs.keys()):
-            self.moments[k] = self.momentum * \
-                self.moments[k] + self.lr * xs_grads[k]
-            if self.nesterov:
-                new_xs[k] = xs[k] + self.momentum * prev_moments[k] - \
-                    (1+self.momentum) * self.moments[k]
-            else:
-                new_xs[k] = xs[k] - self.moments[k]
-        return new_xs
+        if not self.momentum:
+            self.momentum = {}
+            for k, v in w_grads.items():
+                self.momentum[k] = np.zeros(v.shape)
+        for k in list(w.keys()):
+            self.momentum[k] = self.beta * self.momentum[k] + w_grads[k]
+            new_w[k] = w[k] - self.lr * self.momentum[k]
+        return new_w
 
 
 class Adagrad(Optimizer):
@@ -97,45 +89,44 @@ class Adagrad(Optimizer):
         self.accumulators = None
         self.sheduler_func = sheduler_func
 
-    def update(self, xs, xs_grads, iteration):
+    def update(self, w, w_grads, iteration):
         """Initialization
 
         # Arguments
-            xs: dictionary, all weights of model
-            xs_grads: dictionary, gradients to all weights of model, same keys with xs
+            w: dictionary, all weights of model
+            w_grads: dictionary, gradients to all weights of model, same keys with w
             iteration: int, current iteration number in the whole training process (not in that epoch)
 
         # Returns
-            new_xs: dictionary, new weights of model
+            new_w: dictionary, new weights of model
         """
-        new_xs = {}
+        new_w = {}
         if self.decay > 0:
             self.lr *= (1/(1+self.decay*iteration))
         if self.sheduler_func:
             self.lr = self.sheduler(self.sheduler_func, iteration)
         if not self.accumulators:
             self.accumulators = {}
-            for k, v in xs.items():
+            for k, v in w.items():
                 self.accumulators[k] = np.zeros(v.shape)
-        for k in list(xs.keys()):
-            self.accumulators[k] += xs_grads[k]**2
-            new_xs[k] = xs[k] - self.lr * xs_grads[k] / \
-                (np.sqrt(self.accumulators[k]) + self.epsilon)
-        return new_xs
+        for k in list(w.keys()):
+            self.accumulators[k] += w_grads[k]**2
+            new_w[k] = w[k] - self.lr * w_grads[k] / (np.sqrt(self.accumulators[k] + self.epsilon))
+        return new_w
 
 
 class RMSprop(Optimizer):
-    def __init__(self, lr=0.001, rho=0.9, epsilon=None, decay=0, sheduler_func=None):
+    def __init__(self, lr=0.001, bata=0.9, epsilon=None, decay=0, sheduler_func=None):
         """Initialization
 
         # Arguments
             lr: float, learnig rate 
-            rho: float
+            beta: float, the weight of moving average for second moment of gradient
             epsilon: float, precision to avoid numerical error
             decay: float, the learning rate decay ratio
         """
         super(RMSprop, self).__init__(lr)
-        self.rho = rho
+        self.bata = bata
         self.epsilon = epsilon
         self.decay = decay
         if not self.epsilon:
@@ -143,32 +134,30 @@ class RMSprop(Optimizer):
         self.accumulators = None
         self.sheduler_func = sheduler_func
 
-    def update(self, xs, xs_grads, iteration):
+    def update(self, w, w_grads, iteration):
         """Initialization
 
         # Arguments
-            xs: dictionary, all weights of model
-            xs_grads: dictionary, gradients to all weights of model, same keys with xs
+            w: dictionary, all weights of model
+            w_grads: dictionary, gradients to all weights of model, same keys with w
             iteration: int, current iteration number in the whole training process (not in that epoch)
 
         # Returns
-            new_xs: dictionary, new weights of model
+            new_w: dictionary, new weights of model
         """
-        new_xs = {}
+        new_w = {}
         if self.decay > 0:
             self.lr *= (1/(1+self.decay*iteration))
         if self.sheduler_func:
             self.lr = self.sheduler(self.sheduler_func, iteration)
         if not self.accumulators:
             self.accumulators = {}
-            for k, v in xs.items():
+            for k, v in w.items():
                 self.accumulators[k] = np.zeros(v.shape)
-        for k in list(xs.keys()):
-            self.accumulators[k] = self.rho * \
-                self.accumulators[k] + (1 - self.rho) * xs_grads[k]**2
-            new_xs[k] = xs[k] - self.lr * xs_grads[k] / \
-                (np.sqrt(self.accumulators[k]) + self.epsilon)
-        return new_xs
+        for k in list(w.keys()):
+            self.accumulators[k] = self.bata * self.accumulators[k] + (1 - self.bata) * w_grads[k]**2
+            new_w[k] = w[k] - self.lr * w_grads[k] / (np.sqrt(self.accumulators[k] + self.epsilon))
+        return new_w
 
 
 class Adam(Optimizer):
@@ -193,44 +182,39 @@ class Adam(Optimizer):
         if not self.epsilon:
             self.epsilon = 1e-8
 
-        self.moments = None
+        self.momentum = None
         self.accumulators = None
         self.sheduler_func = sheduler_func
 
-    def update(self, xs, xs_grads, iteration):
+    def update(self, w, w_grads, iteration):
         """Initialization
 
         # Arguments
-            xs: dictionary, all weights of model
-            xs_grads: dictionary, gradients to all weights of model, same keys with xs
-            iteration: int, current iteration number in the whole training process (not in that epoch)
+            w: dictionary, all weights of model
+            w_grads: dictionary, gradients to all weights of model, same keys with w
+            iteration: int, current iteration number in the whole training process (not in that epoch, starting from 0)
 
         # Returns
-            new_xs: dictionary, new weights of model
+            new_w: dictionary, new weights of model
         """
-        new_xs = {}
+        new_w = {}
         if self.decay > 0:
             self.lr *= (1/(1+self.decay*iteration))
         if self.sheduler_func:
             self.lr = self.sheduler(self.sheduler_func, iteration)
-        if (self.accumulators is None) and (self.moments is None):
-            self.moments = {}
+        if (self.accumulators is None) and (self.momentum is None):
+            self.momentum = {}
             self.accumulators = {}
-            for k, v in xs.items():
-                self.moments[k] = np.zeros(v.shape)
+            for k, v in w.items():
+                self.momentum[k] = np.zeros(v.shape)
                 self.accumulators[k] = np.zeros(v.shape)
-        for k in list(xs.keys()):
-            self.moments[k] = self.beta_1 * \
-                self.moments[k] + (1-self.beta_1) * xs_grads[k]
-            self.accumulators[k] = self.beta_2 * \
-                self.accumulators[k] + (1 - self.beta_2) * xs_grads[k]**2
+        for k in list(w.keys()):
+            self.momentum[k] = self.beta_1 * self.momentum[k] + (1-self.beta_1) * w_grads[k]
+            self.accumulators[k] = self.beta_2 * self.accumulators[k] + (1 - self.beta_2) * w_grads[k]**2
             if self.bias_correction:
-                moments_t = self.moments[k] / (1 - self.beta_1**(iteration+1))
-                accumulators_t = self.accumulators[k] / \
-                    (1 - self.beta_2**(iteration+1))
-                new_xs[k] = xs[k] - self.lr * moments_t / \
-                    (np.sqrt(accumulators_t)+self.epsilon)
+                momentum_t = self.momentum[k] / (1 - self.beta_1**(iteration+1))
+                accumulators_t = self.accumulators[k] / (1 - self.beta_2**(iteration+1))
+                new_w[k] = w[k] - self.lr * momentum_t / (np.sqrt(accumulators_t+self.epsilon))
             else:
-                new_xs[k] = xs[k] - self.lr * self.moments[k] / \
-                    (np.sqrt(self.accumulators[k]) + self.epsilon)
-        return new_xs
+                new_w[k] = w[k] - self.lr * self.momentum[k] / (np.sqrt(self.accumulators[k] + self.epsilon))
+        return new_w
