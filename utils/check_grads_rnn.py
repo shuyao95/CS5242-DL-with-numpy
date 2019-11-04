@@ -128,6 +128,24 @@ def check_grads_layer(layer, inputs, in_grads):
             results = check_grads(v, numer_grads[k])
             print('Gradient to %s:' % (k), map_bool[str(results < 1e-8)])
 
+def check_grads_layer_error(layer, inputs, in_grads):
+    results = []
+    numer_grads = eval_numerical_gradient_inputs(layer, inputs, in_grads)
+    cacul_grads = layer.backward(in_grads, inputs)
+    if isinstance(cacul_grads, list):
+        for i in range(len(cacul_grads)):
+            inputs_result = check_grads(cacul_grads[i], numer_grads[i])
+    else:
+        inputs_result = check_grads(cacul_grads, numer_grads)
+    results.append(inputs_result)
+    if layer.trainable:
+        numer_grads = eval_numerical_gradient_params(layer, inputs, in_grads)
+        _, cacul_grads = layer.get_params('-')
+        for k, v in cacul_grads.items():
+            r = check_grads(v, numer_grads[k])
+            results.append(r)
+    return results
+
 
 def check_grads_loss(layer, inputs, targets):
     map_bool = {

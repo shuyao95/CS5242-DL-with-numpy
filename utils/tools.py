@@ -10,3 +10,7 @@ def rel_error(x, y):
 
 def warn(*args, **kwargs):
     pass
+
+
+def transpose(M):
+    return list(map(list, zip(*M)))
