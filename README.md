@@ -1,5 +1,5 @@
-# cs5242
-CS5242 Assignments of NUS
+# CS5242
+CS5242 Assignments of NUS (2019)
 
 ## requirements
 ### python version
